@@ -178,6 +178,27 @@ def create_app(
             "schema_version": SCHEMA_VERSION,
         }
 
+    def _models_payload() -> dict[str, Any]:
+        # OpenAI-spec model list. OpenClaw (and other OpenAI-compatible clients)
+        # probe this endpoint to confirm a local provider is reachable before
+        # routing chat completions through it.
+        model_id = getattr(state["capturer"], "model_id", "unknown")
+        return {
+            "object": "list",
+            "data": [
+                {
+                    "id": model_id,
+                    "object": "model",
+                    "created": 0,
+                    "owned_by": "pinchguard",
+                }
+            ],
+        }
+
+    # Both paths: clients probe `/v1/models`; some probe `/models` (no prefix).
+    app.get("/v1/models")(_models_payload)
+    app.get("/models")(_models_payload)
+
     @app.post("/v1/chat/completions")
     def chat_completions(req: ChatCompletionRequest) -> dict[str, Any]:
         cap: Capturer = state["capturer"]
