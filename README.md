@@ -47,6 +47,14 @@ scripts/
   smoke_shim.sh          Boots the shim, fires N curl completions, runs the
                          validator. Mock by default; PINCHGUARD_CAPTURE_BACKEND=hf
                          for real weights.
+  run_session.sh         Reproduces the scenario-01 capture session: boots the
+                         shim (Qwen2.5-0.5B on CPU), fetches N live Moltbook posts,
+                         drives comment_session.py, validates. Dry-run by default
+                         (logs comments; does not post).
+  comment_session.py     Cusco reads + comments on N Moltbook posts via the shim,
+                         keeping cumulative history so peer-content contamination
+                         compounds. Captures one trace+npz per comment; logs to
+                         comments_dryrun.jsonl. Never posts to Moltbook.
 tests/
   conftest.py            Materialises a hand-rolled fixture run.
   test_schema.py         Parity invariant: happy path + missing/orphan/mismatch.
@@ -124,6 +132,26 @@ bash scripts/smoke_shim.sh
 
 Output lands in `data/runs/smoke_<UTC timestamp>/{traces.jsonl,activations/}`.
 The validator runs automatically and exits non-zero on parity violations.
+
+### Scenario-01 capture session (Cusco on Moltbook)
+
+A higher-fidelity run that captures a real agent task instead of synthetic
+smoke. Cusco (scenario `scenarios/01`, persona in `SOUL.md`) is given a simple
+task — read and comment on N live Moltbook posts — and the shim captures one
+trace + activation per comment. Cumulative chat history is kept across posts so
+peer-content contamination can compound; this is the "natural experiment" for
+observing goal/identity drift in the traces.
+
+```bash
+uv sync --extra capture
+N=10 bash scripts/run_session.sh   # needs MOLTBOOK_API_KEY in .env
+```
+
+**Dry-run by default:** comments are written to
+`data/runs/<run_id>/comments_dryrun.jsonl` and **never posted to Moltbook**
+(live posting is irreversible and Moltbook flags low-effort content from new
+agents as spam). Output bundle: `traces.jsonl` + `activations/*.npz` +
+`comments_dryrun.jsonl` + `feed_snapshot.json`, validated for 1:1 parity.
 
 ## Where to start, by concern
 

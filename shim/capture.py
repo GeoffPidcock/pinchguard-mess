@@ -42,8 +42,54 @@ class Capturer(Protocol):
     def capture(self, messages: list[dict[str, Any]], step_id: str) -> CaptureResult: ...
 
 
+def _content_to_text(content: Any) -> str:
+    """Coerce an OpenAI chat `content` field to a plain string.
+
+    OpenClaw (and other OpenAI-compatible clients) may send `content` as a list
+    of structured content parts, e.g. ``[{"type": "text", "text": "hi"}]``,
+    instead of a bare string. HF chat templates concatenate `content` as a
+    string and raise ``TypeError`` on lists, so we flatten the text parts here.
+    """
+    if content is None:
+        return ""
+    if isinstance(content, str):
+        return content
+    if isinstance(content, list):
+        parts: list[str] = []
+        for part in content:
+            if isinstance(part, str):
+                parts.append(part)
+            elif isinstance(part, dict):
+                text = part.get("text")
+                if isinstance(text, str):
+                    parts.append(text)
+        return "".join(parts)
+    return str(content)
+
+
+def _sanitize_messages(messages: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Reduce arbitrary OpenAI messages to template-safe ``{role, content}``.
+
+    Keeps only fields every HF chat template understands; flattens structured
+    content to text. Dropping `tool_calls`/`tool_call_id` keeps templates that
+    don't model tools from breaking — the shim captures activations off the
+    rendered text, so structural tool metadata isn't needed here.
+    """
+    out: list[dict[str, Any]] = []
+    for m in messages:
+        role = m.get("role", "user")
+        msg: dict[str, Any] = {"role": role, "content": _content_to_text(m.get("content"))}
+        name = m.get("name")
+        if isinstance(name, str):
+            msg["name"] = name
+        out.append(msg)
+    return out
+
+
 def _flatten_messages(messages: list[dict[str, Any]]) -> str:
-    return "\n".join(f"{m.get('role', '?')}: {m.get('content', '')}" for m in messages)
+    return "\n".join(
+        f"{m.get('role', '?')}: {_content_to_text(m.get('content'))}" for m in messages
+    )
 
 
 class MockCapturer:
@@ -155,7 +201,7 @@ class HFCapturer:
     def capture(self, messages: list[dict[str, Any]], step_id: str) -> CaptureResult:
         torch = self._torch
         prompt_text = self.tokenizer.apply_chat_template(
-            messages, tokenize=False, add_generation_prompt=True
+            _sanitize_messages(messages), tokenize=False, add_generation_prompt=True
         )
         inputs = self.tokenizer(prompt_text, return_tensors="pt")
 
