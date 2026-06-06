@@ -13,13 +13,13 @@ for validating the Assistant-Axis probe before the full M4 run exists.
 - **dtype**: `float16`
 - **quantization**: `nf4`
 - **capture_runtime**: `hf-eager`
-- **step_id**: `2e03ddc8-eee6-4900-a3b2-eeb471d2698f`
-- **npz**: `2e03ddc8-eee6-4900-a3b2-eeb471d2698f.npz`
+- **step_id**: `3aa8491e-bb42-408f-a549-2657361a304d`
+- **npz**: `3aa8491e-bb42-408f-a549-2657361a304d.npz`
 
 ## Load it
 ```python
 import numpy as np
-a = np.load("2e03ddc8-eee6-4900-a3b2-eeb471d2698f.npz")["L32"]  # shape (1, 5120), float16
+a = np.load("3aa8491e-bb42-408f-a549-2657361a304d.npz")["L32"]  # shape (1, 5120), float16
 ```
 
 ## Open cross-check with Lion

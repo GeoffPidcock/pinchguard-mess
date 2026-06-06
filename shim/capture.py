@@ -92,6 +92,32 @@ def _flatten_messages(messages: list[dict[str, Any]]) -> str:
     )
 
 
+def _guard_single_cuda_device(quantization: str | None, cuda_indices: set[int]) -> None:
+    """Raise if a quantized model's weights span more than one CUDA device.
+
+    Verified 2026-06-06: bitsandbytes 4-bit/8-bit weights sharded across GPUs
+    (e.g. via ``device_map="auto"`` on a 2-GPU box) corrupt the forward pass —
+    generation degrades to token-salad and the captured L32 activations are
+    garbage. The same nf4 quant pinned to a single device is coherent. This is
+    a quantization-specific bug, so the guard only fires when `quantization` is
+    set; full-precision sharding is unaffected and left alone.
+
+    Pure (takes the resolved device-index set, not the model) so it is unit-
+    testable without weights. `cuda_indices` is empty on the CPU/full-precision
+    path, which never trips the guard.
+    """
+    if quantization is None:
+        return
+    if len(cuda_indices) > 1:
+        raise RuntimeError(
+            f"Refusing to capture: quantization={quantization!r} model is sharded "
+            f"across {len(cuda_indices)} CUDA devices {sorted(cuda_indices)}. "
+            "bitsandbytes sharding corrupts the forward pass (token-salad output, "
+            "garbage activations). Pin a single device with "
+            "PINCHGUARD_DEVICE_MAP=cuda:N — never device_map='auto'."
+        )
+
+
 class MockCapturer:
     """Deterministic, numpy-only capture for tests and CPU-poor dev loops."""
 
@@ -193,6 +219,16 @@ class HFCapturer:
 
         self.model = AutoModelForCausalLM.from_pretrained(model_name, **load_kwargs)
         self.model.eval()
+
+        # Belt-and-braces multi-GPU guard: a quantized load that landed on >1
+        # CUDA device (e.g. device_map="auto" sharding) silently captures
+        # garbage, so fail loudly before any capture happens.
+        cuda_indices = {
+            p.device.index
+            for p in self.model.parameters()
+            if p.device.type == "cuda" and p.device.index is not None
+        }
+        _guard_single_cuda_device(self.quantization, cuda_indices)
 
         self._layer_modules = self._resolve_layers()
         max_layer = len(self._layer_modules) - 1
