@@ -4,7 +4,7 @@ RESEARCH*
 PLAN*
 TODO*
 .claude
-<!---->
+
 
 # Pinchguard run artefacts — keep dir, ignore contents (smoke-test data stays local).
 # Exception: the committed schema-v0.2 example run, so collaborators on Concerns
@@ -13,6 +13,7 @@ data/runs/*
 !data/runs/.gitkeep
 !data/runs/schema_v0.2_example/
 !data/runs/schema_v0.2_example/**
+/notebooks/moltbook_data/moltbook_posts.parquet
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
