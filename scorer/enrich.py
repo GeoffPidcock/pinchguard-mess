@@ -48,7 +48,7 @@ _REPO_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(_REPO_ROOT))
 
 from scorer.build_history import build_histories
-from scorer.auditor import score_step, DEFAULT_JUDGE_MODEL
+from scorer.auditor import score_step, DEFAULT_JUDGE_MODEL, load_persona_vars_from_soul
 from scorer.schema import AuditorOutput
 
 
@@ -90,12 +90,38 @@ def enrich_traces(
     model: str | None = None,
     dry_run: bool = False,
     delay_between_calls: float = 1.0,
+    soul_path: Path | None = None,
 ) -> list[dict[str, Any]]:
     """Score all rows in traces_path and write to out_path.
+
+    Parameters
+    ----------
+    traces_path:          Path to the input traces.jsonl.
+    out_path:             Destination for traces_enriched.jsonl.
+    model:                OpenRouter model string override.
+    dry_run:              If True, use mock auditor (no API calls).
+    delay_between_calls:  Seconds to wait between real API calls.
+    soul_path:            Optional path to a SOUL.md file.  When provided, persona
+                          variables are extracted from it and injected into the judge
+                          prompt template, making the scorer persona-agnostic.
+                          If None, the built-in Cusco defaults are used.
 
     Returns the list of enriched row dicts.
     """
     resolved_model = model or os.environ.get("PINCHGUARD_JUDGE_MODEL", DEFAULT_JUDGE_MODEL)
+
+    # Resolve persona variables from SOUL.md (or fall back to Cusco defaults)
+    persona_vars = None
+    soul_label: str = "(default: Cusco)"
+    if soul_path is not None:
+        if not soul_path.exists():
+            print(f"[enrich] WARNING: SOUL.md not found at {soul_path} — using defaults.",
+                  file=sys.stderr)
+        else:
+            persona_vars = load_persona_vars_from_soul(soul_path)
+            soul_label = str(soul_path)
+            print(f"[enrich] Persona loaded from: {soul_path}")
+            print(f"[enrich] Agent name: {persona_vars.get('agent_name', '?')}")
 
     # Read traces
     raw_lines = [l for l in traces_path.read_text(encoding="utf-8").splitlines() if l.strip()]
@@ -116,6 +142,7 @@ def enrich_traces(
 
     print(f"[enrich] Scoring {total} row(s) from {traces_path}")
     print(f"[enrich] Judge model: {'MOCK (dry-run)' if dry_run else resolved_model}")
+    print(f"[enrich] Soul file:   {soul_label}")
     print(f"[enrich] Output -> {out_path}\n")
 
     for i, (row, history) in enumerate(zip(rows, histories)):
@@ -127,12 +154,16 @@ def enrich_traces(
             if dry_run:
                 result = _mock_score(row, history)
             else:
-                result = score_step(row, history, model=resolved_model)
+                result = score_step(row, history, model=resolved_model,
+                                    persona_vars=persona_vars)
 
             enriched = {
                 **row,
                 "label_behav": result.label_behav,
-                "label_behav_meta": result.to_label_behav_meta(judge_model=resolved_model),
+                "label_behav_meta": {
+                    **result.to_label_behav_meta(judge_model=resolved_model),
+                    "soul_file": soul_label,
+                },
             }
             flag = "[DRIFT]" if result.deception_detected else "[ok]   "
             print(f"{flag}  severity={result.severity}  confidence={result.confidence:.2f}")
@@ -199,6 +230,18 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         help=f"OpenRouter model string (default: {DEFAULT_JUDGE_MODEL}).",
     )
     p.add_argument(
+        "--soul-file",
+        type=Path,
+        default=None,
+        metavar="SOUL_MD",
+        help=(
+            "Path to a SOUL.md file for the agent being scored. When provided, "
+            "persona variables (agent name, guardrails, model size, etc.) are extracted "
+            "from the file and injected into the judge prompt, overriding the built-in "
+            "Cusco defaults. Example: scenarios/01/SOUL.md"
+        ),
+    )
+    p.add_argument(
         "--dry-run",
         action="store_true",
         help="Use mock auditor — no API calls, no key required.",
@@ -252,6 +295,7 @@ def main(argv: list[str] | None = None) -> int:
         model=args.model,
         dry_run=args.dry_run,
         delay_between_calls=args.delay,
+        soul_path=args.soul_file,
     )
     return 0
 
