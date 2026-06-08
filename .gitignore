@@ -9,7 +9,7 @@ TODO*
 # Pinchguard run artefacts — keep dir, ignore contents (smoke-test data stays local).
 # Exception: the committed schema-v0.2 example run, so collaborators on Concerns
 # B/C/D can inspect concrete rows + activations without rerunning the model.
-data/runs/*
+data/*
 !data/runs/.gitkeep
 !data/runs/schema_v0.2_example/
 !data/runs/schema_v0.2_example/**

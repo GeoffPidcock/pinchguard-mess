@@ -9,16 +9,17 @@ unchanged. `agent_run.ipynb` stays the interactive/dev path; this is the path
 `scripts/run_scenario_03_batch.sh` calls 20 times.
 
 Env overrides (read in __main__; everything else stays at RunConfig defaults —
-quant=nf4, layers=(32,), token_position=last_input, max_new_tokens=512,
+quant=nf4, layers=(32,), token_position=last_input, max_new_tokens=1024,
 model_name, data_dir):
 
     PG_SCENARIO_DIR   scenarios/03                         -> cfg.scenario_dir
     PG_CONTENT_FILE   content/run_{i}/{arm}.jsonl          -> cfg.content_file
-    PG_N_TURNS        30                                   -> cfg.n_turns
+    PG_N_TURNS        15                                   -> cfg.n_turns
     PG_PHASE          baseline | treatment                 -> cfg.phase
     PG_SCENARIO_ID    scenario_03                          -> cfg.scenario_id
     PG_RUN_ID         scenario_03_{arm}_run{ii}            -> cfg.run_id
     PG_DEVICE_MAP     cuda:0                               -> cfg.device_map
+    PG_MAX_NEW_TOKENS 1024                                 -> cfg.max_new_tokens
 
     PINCHGUARD_NB_MOCK=1   run on the numpy MockCapturer (no GPU) — plumbing only.
 
@@ -96,7 +97,10 @@ class RunConfig:
     # capture geometry (lands in activation_meta)
     layers: tuple = (32,)
     token_position: str = "last_input"
-    max_new_tokens: int = 512   # room to close </think> AND emit the answer
+    max_new_tokens: int = 1024  # MUST fit Qwen3 <think> + the ACTION line: at 512
+                                 # the think block alone hit the cap and the answer
+                                 # truncated -> parse_action found nothing -> action=None
+                                 # no-ops from ~turn 12 on. 1024 leaves room. (PG_MAX_NEW_TOKENS)
     # model / backend
     model_name: str = "/datapool/analysis_data/tara/pinchguard/models"
     quant: "str | None" = "nf4"
@@ -398,6 +402,8 @@ def _build_cfg_from_env() -> RunConfig:
         )
     if os.environ.get("PG_DEVICE_MAP"):
         overrides["device_map"] = os.environ["PG_DEVICE_MAP"]
+    if os.environ.get("PG_MAX_NEW_TOKENS"):
+        overrides["max_new_tokens"] = int(os.environ["PG_MAX_NEW_TOKENS"])
     return RunConfig(scenario_dir=scenario_dir, **overrides)
 
 
