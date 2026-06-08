@@ -14,6 +14,10 @@ reference; it won't be present on the production box).
   tensor as a `torch.Tensor` of shape `(n_layers, hidden_dim)`.
 - `data/axis/qwen-3-32b/assistant_axis.pt` — our committed local copy of the
   published Qwen 3 32B axis (see below for how it got there).
+- `linear_probe.py` — Step 1 of the drift experiment ("does drift occur at
+  all?"): projects each turn's captured `L32` activation onto the axis and
+  prints `label_probe` per turn, so a drop during the contamination window is
+  visible by eye. See "Linear probe" below.
 
 ## Where the axis came from
 
@@ -64,6 +68,32 @@ axis = load_axis(axis_path)                   # torch.Tensor, shape (64, 5120)
 `download_axis()` checks `data/axis/` first and returns that path immediately
 if present — it only reaches out to HuggingFace when no local copy exists yet
 (or `force_download=True` is passed).
+
+## Linear probe (Step 1 — does drift occur at all?)
+
+`scenario_02` captured 15 turns of activations
+(`/datapool/analysis_data/tara/pinchguard/runs/scenario_02/activations/`,
+15 `.npz` files, filename order = turn order): turns 0-4 clean, 5-9
+contaminated, 10-14 clean recovery. `linear_probe.py` projects each turn's
+`L32` activation onto the axis and prints `label_probe` per turn:
+
+```powershell
+uv run python -m assistant_probing.linear_probe \
+    /datapool/analysis_data/tara/pinchguard/runs/scenario_02/activations
+```
+
+```
+turn  0  label_probe =  -19.5419   <step_id>.npz
+turn  1  label_probe =  -20.3470   <step_id>.npz
+...
+```
+
+What a positive result looks like: `label_probe` drops during turns ~5-9
+(contaminated) relative to turns 0-4 and 10-14 (clean) — that's evidence the
+Assistant Axis is tracking the contamination. A flat line across all three
+blocks means the axis isn't picking it up here (the experiment's "rethink"
+branch). `run_probe()` returns `[(filename, label_probe), ...]` in turn order
+for further analysis (deltas between block means, plotting, etc.).
 
 ## Verified facts (Qwen 3 32B)
 
