@@ -10,14 +10,20 @@ reference; it won't be present on the production box).
 
 ## What's here
 
-- `axis.py` — `download_axis()` + `load_axis()`: fetch and load the axis
+- `axis_download.py` — `download_axis()` + `load_axis()`: fetch and load the axis
   tensor as a `torch.Tensor` of shape `(n_layers, hidden_dim)`.
 - `data/axis/qwen-3-32b/assistant_axis.pt` — our committed local copy of the
   published Qwen 3 32B axis (see below for how it got there).
-- `linear_probe.py` — Step 1 of the drift experiment ("does drift occur at
+- `projection.py` — Step 1 of the drift experiment ("does drift occur at
   all?"): projects each turn's captured `L32` activation onto the axis and
   prints `label_probe` per turn, so a drop during the contamination window is
   visible by eye. See "Linear probe" below.
+- `linear_probe.py` *(gitignored, WIP)* — trains a logistic-regression probe
+  directly from the published per-role activation vectors
+  (`lu-christina/assistant-axis-vectors`, `qwen-3-32b/`): 275 role vectors
+  (label 0) vs. the default Assistant vector (label 1). The trained probe
+  scores a single turn capture for `prob_assistant`. Use `train` to fit and
+  save `probe.joblib`, `infer` to score a `.npz`.
 
 ## Where the axis came from
 
@@ -74,12 +80,13 @@ if present — it only reaches out to HuggingFace when no local copy exists yet
 `scenario_02` captured 15 turns of activations
 (`/datapool/analysis_data/tara/pinchguard/runs/scenario_02/activations/`,
 15 `.npz` files, filename order = turn order): turns 0-4 clean, 5-9
-contaminated, 10-14 clean recovery. `linear_probe.py` projects each turn's
+contaminated, 10-14 clean recovery. `projection.py` projects each turn's
 `L32` activation onto the axis and prints `label_probe` per turn:
 
 ```powershell
-uv run python -m assistant_probing.linear_probe \
-    /datapool/analysis_data/tara/pinchguard/runs/scenario_02/activations
+uv run python -m assistant_probing.projection \
+    /datapool/analysis_data/tara/pinchguard/runs/scenario_02/activations \
+    ./data/axis
 ```
 
 ```
