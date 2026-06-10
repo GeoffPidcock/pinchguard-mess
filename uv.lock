@@ -3205,6 +3205,10 @@ analysis = [
     { name = "polars" },
     { name = "scikit-learn" },
 ]
+assistant-probing = [
+    { name = "huggingface-hub" },
+    { name = "torch" },
+]
 capture = [
     { name = "accelerate" },
     { name = "bitsandbytes" },
@@ -3239,7 +3243,7 @@ requires-dist = [
     { name = "fastapi" },
     { name = "fastparquet", marker = "extra == 'notebooks'", specifier = ">=2026.5.0" },
     { name = "httpx" },
-    { name = "huggingface-hub", marker = "extra == 'notebooks'", specifier = ">=1.16.1" },
+    { name = "huggingface-hub", marker = "extra == 'assistant-probing'" },
     { name = "inspect-ai", specifier = ">=0.3.50" },
     { name = "ipykernel", marker = "extra == 'notebooks'", specifier = ">=7.2.0" },
     { name = "ipywidgets", marker = "extra == 'notebooks'", specifier = ">=8.1.8" },
@@ -3249,19 +3253,18 @@ requires-dist = [
     { name = "nnterp", marker = "extra == 'capture'" },
     { name = "numpy" },
     { name = "openai", marker = "extra == 'notebooks'" },
-    { name = "pandas", marker = "extra == 'notebooks'", specifier = ">=3.0.3" },
     { name = "polars", marker = "extra == 'analysis'" },
     { name = "pyarrow", marker = "extra == 'notebooks'", specifier = ">=24.0.0" },
     { name = "pydantic", specifier = ">=2" },
     { name = "pytest", marker = "extra == 'dev'", specifier = ">=8" },
     { name = "python-dotenv", marker = "extra == 'notebooks'", specifier = ">=1.2.2" },
     { name = "scikit-learn", marker = "extra == 'analysis'" },
-    { name = "scikit-learn", marker = "extra == 'notebooks'", specifier = ">=1.8.0" },
+    { name = "torch", marker = "extra == 'assistant-probing'" },
     { name = "torch", marker = "extra == 'capture'" },
     { name = "transformers", marker = "extra == 'capture'" },
     { name = "uvicorn" },
 ]
-provides-extras = ["capture", "analysis", "dev", "notebooks"]
+provides-extras = ["capture", "assistant-probing", "analysis", "dev", "notebooks"]
 
 [[package]]
 name = "platformdirs"
