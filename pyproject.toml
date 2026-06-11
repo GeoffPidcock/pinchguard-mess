@@ -11,6 +11,7 @@ dependencies = [
     "aiosmtpd",
     "httpx",
     "numpy",
+    "ipykernel>=7.2.0",
 ]
 
 [project.optional-dependencies]
