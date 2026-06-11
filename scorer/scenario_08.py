@@ -1,70 +1,70 @@
 import sys
-import shutil
+import os
 from pathlib import Path
+import dotenv
 
-# Insert parent directory to sys.path if pinchguard/scorer is located there
+# load env variables including OPENROUTER_API_KEY
+dotenv.load_dotenv()
+
+# Insert parent repository root so the 'scorer' package is discoverable
 sys.path.insert(0, str(Path.cwd().parent))
 
-# TODO: Update these imports based on your pinchguard/scorer/README.md interface
-# For example, if it exposes an execution function:
-# from pinchguard.scorer import run_behavioral_scorer, save_results
+# Import the core enrichment logic directly from your module
+from scorer.enrich import enrich_traces
 
-
-# --- Configure Paths (Grounded in your provided configuration) ---
-SOURCE_RUNS_DIR = Path("/datapool/analysis_data/tara/pinchguard") / "runs"
-LOCAL_DATA_DIR = Path.cwd() / ".data"
-SCENARIO_NAME = "scenario_08"
-# Ensure local staging directory exists
-LOCAL_DATA_DIR.mkdir(parents=True, exist_ok=True)
-
+# --- Configure Paths ---
+SHARED_RUNS_DIR = Path("/datapool/analysis_data/tara/pinchguard") / "runs"
+LOCAL_OUTPUT_DIR = Path.cwd() / ".data"
+SCEN_NAME = 'scenario_08' # update, used in selecting directories
+SOUL_PATH = Path("/home/geoff/dev/pinchguard/scenarios/08/SOUL.md") # update, used to refer to the SOUL or persona used in the scenario
+BOUNDARY_PATH = Path("/home/geoff/dev/pinchguard/scenarios/08/BOUNDARY.md") # update, used to refer to the boundary used in the scenario
 
 def main():
-    print(f"Scanning source directory: {SOURCE_RUNS_DIR}")
+    # Verify OpenRouter credentials before starting real LLM calls
+    if not os.environ.get("OPENROUTER_API_KEY"):
+        print("[orchestrator] WARNING: OPENROUTER_API_KEY environment variable is not set.")
+        print("[orchestrator] If you want to test the script loop first, pass dry_run=True to enrich_traces.\n")
+
+    print(f"Scanning shared runs directory: {SHARED_RUNS_DIR}")
     
-    # Find items starting with 'scenario_08' that are actual directories
-    # This filters out the '.shim.log' files natively without needing a separate grep
-    scenario_dirs = [d for d in SOURCE_RUNS_DIR.glob(f"{SCENARIO_NAME}*") if d.is_dir()]
+    # Native path filtering: matches scenario_08 folders while ignoring *.shim.log files
+    scenario_dirs = [d for d in SHARED_RUNS_DIR.glob(f"{SCEN_NAME}*") if d.is_dir()]
     
     if not scenario_dirs:
-        print("No matching scenario_08 directories found. Check your SOURCE_RUNS_DIR path.")
+        print(f"No matching {SCEN_NAME} directories found in {SHARED_RUNS_DIR}")
         return
 
-    print(f"Found {len(scenario_dirs)} target scenario folders to process.\n")
+    print(f"Found {len(scenario_dirs)} shared run folders to evaluate.\n")
 
     for src_dir in sorted(scenario_dirs):
         run_name = src_dir.name
-        print(f"{'='*60}")
-        print(f"Processing Run: {run_name}")
-        print(f"{'='*60}")
+        print(f"{'='*80}")
+        print(f"Evaluating Shared Run: {run_name}")
+        print(f"{'='*80}")
         
-        # Define local target path
-        dest_dir = LOCAL_DATA_DIR / run_name
-        
-        # Copy trace folder to local staging directory if not already copied
-        if not dest_dir.exists():
-            print(f"Staging to local directory: {dest_dir}...")
-            # Using dirs_exist_ok=True if you run this python version repeatedly
-            shutil.copytree(src_dir, dest_dir, dirs_exist_ok=True)
-        else:
-            print(f"Local directory already exists at {dest_dir} (skipping copy step).")
+        shared_traces_path = src_dir / "traces.jsonl"
+        if not shared_traces_path.exists():
+            print(f"Skipping: {shared_traces_path.name} missing from {src_dir}")
+            continue
             
-        # --- Run LLM-Judge Behavioral Scorer ---
-        print(f"Invoking behavioral scorer on traces in: {dest_dir}")
+        # Designate local output target path inside .data/
+        local_output_path = LOCAL_OUTPUT_DIR / run_name / "traces_enriched.jsonl"
+
         try:
-            # OPTION A: If your README specifies a Python API integration:
-            scores = run_behavioral_scorer(trace_dir=dest_dir)
-            print(f"Results for {run_name}: {scores}")
-            
-            # OPTION B: If your README specifies running it via a CLI script/module:
-            # import subprocess
-            # cmd = [sys.executable, "-m", "pinchguard.scorer", "--input", str(dest_dir)]
-            # result = subprocess.run(cmd, capture_output=True, text=True, check=True)
-            # print(result.stdout)
-            
-            print(f"Successfully processed evaluation for {run_name}.\n")
+            # Invoke the pipeline function directly
+            enrich_traces(
+                traces_path=shared_traces_path,
+                out_path=local_output_path,
+                boundary_path=BOUNDARY_PATH,
+                soul_path=SOUL_PATH,
+                dry_run=False,              # Flip to True to test with the mock auditor
+                delay_between_calls=1.0,     # Standard 1 second rate-limiting backoff
+                model="gpt-4o-mini" # Uses PINCHGUARD_JUDGE_MODEL env var or default if None
+            )
+            print(f"Completed run evaluation. Output saved to local workspace.\n")
             
         except Exception as e:
-            print(f"Error running scorer on {run_name}: {e}\n")
+            print(f"Execution failed on scenario run {run_name}: {e}\n")
 
 
 if __name__ == "__main__":
