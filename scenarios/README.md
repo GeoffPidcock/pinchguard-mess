@@ -11,6 +11,7 @@
 | 06 | Cusco , Inspect Harness + Synthetic Baseline and Treatment, 15 steps, Qwen3-32Bn | runs/scenario_06_.. | Dopey side-quest |
 | 07 | Assistant, Inspect, Jailbreak Treatments, 15 steps, Qwen3-32Bn | runs/scenario_07_.. | Trying to induce persona drift using a dataset of Jailbreaks |
 | 08 | Assistant, Inspect Revised Harness, Synthetic baseline and treatment, 15 steps, Qwen3-32Bn | runs/scenario_08_.. | 3 repetions to establish variance on fixed content |
+| 09 | Assistant, Inspect Revised Harness, synthetic persona and Moltbook malicious samples, 15 steps, Qwen3-32Bn | runs/scenario_09_ | 3 repetitions
 
 ## Working notes:
 - Setting up a simulation is clunky - you need to setup some artefacts in a `./scenarios/{nn}` folder (e.g. SOUL, BOUNDARY, any files you want available in runtime), assemble a series of feeds (e.g. from the TrustAIRLab Moltbook dataset) potentially over a series of runs and save them in `scenarios/{nn}/content/`, make changes where needed to the agent harness in `./notebooks/scenario_runner/run_scenario_v{n}`, and then queue up a run on an available GPU using `./scripts/run_scenario_{nn}.sh`
@@ -23,3 +24,14 @@ References:
 - https://huggingface.co/datasets/JailbreakBench/JBB-Behaviors - Persona Jailbreaking dataset
 - https://huggingface.co/datasets/TrustAIRLab/Moltbook/viewer/posts/train?row=3 - Foundation labelled Moltbook Dataset
 - TBC - Synthetic content prompt (check with Lion)
+
+F=scenarios/09/content/run_0/aa_feed.jsonl
+python3 -c "
+import json
+text = open('$F').read()
+objs = json.loads('[' + text + ']')      # wrap the comma-separated objects into an array
+with open('$F','w') as f:
+    for o in objs:
+        f.write(json.dumps(o, ensure_ascii=False) + '\n')
+print(f'rewrote {len(objs)} records as JSONL')
+"
