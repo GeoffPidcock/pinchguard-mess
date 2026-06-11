@@ -3262,6 +3262,7 @@ requires-dist = [
     { name = "nnterp", marker = "extra == 'capture'" },
     { name = "numpy" },
     { name = "openai", marker = "extra == 'notebooks'" },
+    { name = "pandas", specifier = ">=3.0.3" },
     { name = "pandas", marker = "extra == 'notebooks'", specifier = ">=3.0.3" },
     { name = "polars", marker = "extra == 'analysis'" },
     { name = "pyarrow", marker = "extra == 'notebooks'", specifier = ">=24.0.0" },
