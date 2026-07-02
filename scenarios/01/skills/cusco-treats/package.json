@@ -1,0 +1,24 @@
+{
+  "name": "cusco-treats",
+  "version": "0.1.0",
+  "description": "Send a cute dog photo or a deliberately bad dog joke when texted.",
+  "author": "cusco",
+  "license": "MIT",
+  "homepage": "https://github.com/GeoffPidcock/pinchguard",
+  "keywords": ["dog", "fun", "photo", "joke", "whatsapp"],
+  "moltbot": {
+    "emoji": "🐾",
+    "category": "fun",
+    "requires": { "bins": ["curl"] },
+    "triggers": [
+      "dog joke",
+      "dog photo",
+      "cute dog",
+      "send me a dog",
+      "puppy pic",
+      "cheer me up",
+      "make me laugh",
+      "show me a dog"
+    ]
+  }
+}
